@@ -11,6 +11,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// Ternary digit.
+pub type Trit = i8;
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -58,7 +61,7 @@ pub struct BottleHeader {
 // ---------------------------------------------------------------------------
 
 /// A SuperInstance bottle: JSON envelope carrying an opaque msgpack payload.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Bottle {
     pub id: Uuid,
     pub ver: u32,
@@ -66,6 +69,7 @@ pub struct Bottle {
     pub tgt: String,
     pub act: String,
     pub trits: Vec<i8>,
+    /// Encoding identifier (always "msgpack").
     pub enc: String,
     pub pay: String, // base64-encoded payload
     pub ttl: u32,
@@ -94,6 +98,29 @@ impl Bottle {
             pay: B64.encode(encoded),
             ttl,
         })
+    }
+
+    /// Create a bottle with raw payload bytes. Msgpack-wraps the bytes,
+    /// then base64-encodes into `pay`.
+    pub fn new_raw(
+        src: impl Into<String>,
+        tgt: impl Into<String>,
+        act: impl Into<String>,
+        trits: Vec<i8>,
+        raw_payload: Vec<u8>,
+        ttl: u32,
+    ) -> Self {
+        Self {
+            id: Uuid::now_v7(),
+            ver: 1,
+            src: src.into(),
+            tgt: tgt.into(),
+            act: act.into(),
+            trits,
+            enc: "msgpack".into(),
+            pay: B64.encode(rmp_serde::to_vec(&raw_payload).unwrap()),
+            ttl,
+        }
     }
 
     /// Convenience: create a bottle with no structured payload (empty msgpack).
